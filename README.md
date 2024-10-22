@@ -1,4 +1,4 @@
-# The Great British Emulator 🇬🇧 🇬🇧 🇬🇧 (Gameboy I guess...)
+# The Great British Emulator 🇬🇧 🇬🇧 🇬🇧 (Gameboy I guess...) (WIP)
 ## GB-Emulator stands for GREAT BRITISH EMULATOR 🇬🇧!! Not to be mistaken with "GameBoy Emulator 🤮"
 ### God save our gracious King!
 Long live our noble King!
