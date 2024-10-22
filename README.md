@@ -16,3 +16,8 @@ To sing with heart and voice,
 God save the King.
 
 ![UK](https://i.giphy.com/HCFjjlwM7HlH64aCbw.webp)
+
+FAQ:  
+Q: Why should I take part in the using of this delectable piece of media?
+
+A: Because it's british :)
