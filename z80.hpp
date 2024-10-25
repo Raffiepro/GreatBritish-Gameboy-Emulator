@@ -21,9 +21,9 @@ enum z80Cond : u8
     cc
 };
 
-char setBit(u8 byte, u8 bit, bool value)
+void setBit(u8* byte, u8 bit, bool value)
 {
-    return value ? (byte | (1<<bit)) : (byte & ~(1<<bit));
+    *byte = value ? (*byte | (1<<bit)) : (*byte & ~(1<<bit));
 }
 
 struct z80
@@ -57,13 +57,14 @@ struct z80
         *reg=*n8;
     }
     inline void JR(s8 offset){pc+=offset+2;jumped=true;} //JUMP RELATIVE (+2 to include itself in the PC)
-    inline void JR(z80Cond cond,s8* offset) //JUMP RELATIVE WITH CONDITION
+    void JR(z80Cond cond,s8* offset) //JUMP RELATIVE WITH CONDITION
     {
-        if(cond==cnz&&*f&fz) return;
-        if(cond==cz&&!(*f&fz)) return;
-        if(cond==cnc&&*f&fc) return;
-        if(cond==cc&&!(*f&fc)) return;
-        pc+=*offset+2;  jumped=true;
+        //if(cond==cnz) printf("MOMOMOMO %02X %02X\n",*f,*f&0x80);
+        if(cond==cnz&&*f&0x80) return; //Hacky way of checking zero flag :)
+        if(cond==cz&&!(*f&80)) return;
+        if(cond==cnc&&*f&0x10) return; //Hacky way of checking carry flag :)
+        if(cond==cc&&!(*f&0x10)) return;
+        pc+= *offset+2;  jumped=true;
     }
 
     void printRegs()
@@ -91,23 +92,24 @@ struct z80
         f.seekg(0);
         f.read((char*)&bus,size);
         f.close();
-        std::cout<<"Name: "<<headerFromBus(bus).title<<" size: "<<size<<"B "<<((float)size/sizeof(bus))*100<<"\% usage of total memory\n";
+        std::cout<<"Name: "<<headerFromBus(bus).title<<" size: "<<size<<"b "<<((float)size/sizeof(bus))*100<<"\% usage of total memory\n";
     }
 };
 
 inline void z80::INC(u8* reg)
 {
-    setBit(*f,fh,(*reg&0x0F + 1) > 0x0F);
-    *reg++;
-    setBit(*f,fz,*reg==0);
-    setBit(*f,fn,0);
+    setBit(f,fh,(*reg&0x0F + 1) > 0x0F);
+    *reg+=1;
+    setBit(f,fz,*reg==0);
+    setBit(f,fn,0);
 }
 inline void z80::DEC(u8* reg)
 {
-    setBit(*f,fh,(*reg&0x0F + 1) > 0x0F);
+    u8 hctest = *reg&0x0F; hctest-=1;
+    setBit(f,fh,hctest > (u8)0x0F);
     *reg-=1;
-    setBit(*f,fz,*reg==0);
-    setBit(*f,fn,1);
+    setBit(f,fz,*reg==0);
+    setBit(f,fn,1);
 }
 
 //LD HL n16 (0x21) DONE
@@ -119,7 +121,13 @@ inline void z80::DEC(u8* reg)
 
 void z80::decode(u8* op)
 {
-    printf("%s (%02X)\n",unprefixed[*op].mnemonic,*op); 
+    printf("%s (%02X",unprefixed[*op].mnemonic,*op); 
+    for(int i=1;i<unprefixed[*op].bytes;i++)
+    {
+        printf(" %02X",*(op+i));
+    }
+    printf(")\n");
+
     const u8 length = unprefixed[*op].bytes;
     switch(*op)
     {
@@ -127,10 +135,10 @@ void z80::decode(u8* op)
         case 0x05: DEC(b); break;
         case 0x06: LD(b,op+1); break;
         case 0x0E: LD(c,op+1); break;
-        case 0x20: JR(cnz,(s8*)(op+1));
+        case 0x20: JR(cnz,(s8*)(op+1)); break;
         case 0x21: LD(&hl,(u16*)(op+1)); break;
         case 0x2C: INC(l); break;
-        case 0x32: LD(&bus[hl],a); hl--; break; //LD [HL-] A (0x32)
+        case 0x32: LD(&bus[hl],a); hl-=1; break; //LD [HL-] A (0x32)
         case 0xC3:
         {
             pc=*(u16*)(op+1);
