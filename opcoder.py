@@ -11665,7 +11665,12 @@ def opcode(type):
                 f.write("\n\t")
                 hitem = 0
             
-            f.write("{\"" + str(value["mnemonic"]) + "\"," + str(value["bytes"]) + ",")
+            f.write("{\"" + value["mnemonic"])
+            
+            for i in value["operands"]:
+                f.write(" " + i["name"])
+
+            f.write("\"," + str(value["bytes"]) + ",")
             f.write(str(value["cycles"][0]))  # Convert cycles to string
             
             if len(value["cycles"]) > 1:

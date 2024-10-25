@@ -1,5 +1,7 @@
 #pragma once
-#include <stdint.h>
+#include"types.h"
+
+//NEW LICENSEE CODES MISSING
 
 const uint8_t licensee_codes[] = {0x00,0x01,0x08,0x09,0x0A,0x0B,0x0C,0x13,0x18,0x19,0x1A,0x1D,0x1F,0x24,0x25,0x28,0x29,0x30,0x31,0x32,0x33,0x34,0x35,0x38,0x39,0x3C,0x3E,0x41,0x42,0x44,0x46,0x47,0x49,0x4A,0x4D,0x4F,0x50,0x51,0x52,0x53,0x54,0x55,0x56,0x57,0x59,0x5A,0x5B,0x5C,0x5D,0x60,0x61,0x67,0x69,0x6E,0x6F,0x70,0x71,0x72,0x73,0x75,0x78,0x79,0x7A,0x7C,0x7F,0x80,0x83,0x86,0x8B,0x8C,0x8E,0x8F,0x91,0x92,0x93,0x95,0x96,0x97,0x99,0x9A,0x9B,0x9C,0x9D,0x9F,0xA1,0xA2,0xA4,0xA6,0xA7,0xA9,0xAA,0xAC,0xAD,0xAF,0xB0,0xB1,0xB2,0xB4,0xB6,0xB7,0xB9,0xBA,0xBB,0xBD,0xBF,0xC0,0xC2,0xC3,0xC4,0xC5,0xC6,0xC8,0xC9,0xCA,0xCB,0xCC,0xCD,0xCE,0xCF,0xD0,0xD1,0xD2,0xD3,0xD4,0xD6,0xD7,0xD9,0xDA,0xDB,0xDD,0xDE,0xDF,0xE0,0xE1,0xE2,0xE3,0xE5,0xE7,0xE8,0xE9,0xEA,0xEB,0xEC,0xEE,0xF0,0xF3,0xFF};
 
@@ -30,10 +32,18 @@ uint8_t get_cartridge_type_name(uint8_t code)
     return 0;
 }
 
-void read_offset(FILE* f, char* buf, size_t offset, size_t size)
+void fread_offset(FILE* f, char* buf, size_t offset, size_t size) //FILE
 {
     fseek(f, offset, SEEK_SET);
     fread(buf, size, 1, f);
+}
+
+void bread_offset(u8* bus, char* buf, u16 offset, u16 size) //MEMORY BUS
+{
+    for(u16 i=0;i<size;i++)
+    {
+        buf[i] = bus[offset+i];
+    }
 }
 
 struct gb_header
@@ -48,22 +58,40 @@ struct gb_header
     uint8_t version;
 };
 
-struct gb_header file(int argc, char *argv[])
+struct gb_header headerFromFile(const char *filename)
 {
-    FILE* f = fopen(argv[1], "r");
+    FILE* f = fopen(filename, "r");
 
     struct gb_header header;
 
-    read_offset(f, header.title, 0x134, 16);   header.title[16]=0;
-    read_offset(f, (char*)&header.SGB_Flag, 0x146, 1);
-    read_offset(f, (char*)&header.cartridge_type, 0x147, 1);
-    read_offset(f, (char*)&header.rom_size, 0x148, 1);
-    read_offset(f, (char*)&header.ram_size, 0x149, 1);
-    read_offset(f, (char*)&header.dest_code, 0x14A, 1);
-    read_offset(f, (char*)&header.old_licensee_code, 0x14B, 1);
-    read_offset(f, (char*)&header.version, 0x14C, 1);
+    fread_offset(f, header.title, 0x134, 16);   header.title[16]=0;
+    fread_offset(f, (char*)&header.SGB_Flag, 0x146, 1);
+    fread_offset(f, (char*)&header.cartridge_type, 0x147, 1);
+    fread_offset(f, (char*)&header.rom_size, 0x148, 1);
+    fread_offset(f, (char*)&header.ram_size, 0x149, 1);
+    fread_offset(f, (char*)&header.dest_code, 0x14A, 1);
+    fread_offset(f, (char*)&header.old_licensee_code, 0x14B, 1);
+    fread_offset(f, (char*)&header.version, 0x14C, 1);
 
     fclose(f);
+    return header;
+    
+    //const char* licensee = licensee_names[get_licensee_name(old_licensee_code)];
+    //const char* cartridge_type_s = cartridge_types[get_cartridge_type_name(cartridge_type)];
+}
+
+struct gb_header headerFromBus(u8* bus)
+{
+    struct gb_header header;
+
+    bread_offset(bus, header.title, 0x134, 16);   header.title[16]=0;
+    bread_offset(bus, (char*)&header.SGB_Flag, 0x146, 1);
+    bread_offset(bus, (char*)&header.cartridge_type, 0x147, 1);
+    bread_offset(bus, (char*)&header.rom_size, 0x148, 1);
+    bread_offset(bus, (char*)&header.ram_size, 0x149, 1);
+    bread_offset(bus, (char*)&header.dest_code, 0x14A, 1);
+    bread_offset(bus, (char*)&header.old_licensee_code, 0x14B, 1);
+    bread_offset(bus, (char*)&header.version, 0x14C, 1);
     return header;
     
     //const char* licensee = licensee_names[get_licensee_name(old_licensee_code)];
