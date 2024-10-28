@@ -8,7 +8,8 @@ int main()
 
     while(true)
     {
-        getchar();
+        // THE REASON I HAVE COMMENTED OUT NEARLY ALL DEBUG INFO IS BECAUSE I AM TRYING TO CODE THE MISSING OPCODES AS FAST AS I CAN
+        //getchar();
         cpu.execute();
     }
 }
