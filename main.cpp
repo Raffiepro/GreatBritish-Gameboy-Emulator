@@ -5,6 +5,7 @@ int main()
 {
     z80 cpu;
     cpu.loadFile("Tetris.gb");
+    cpu.bus[0xFF44] = 0x94;
 
     while(true)
     {
