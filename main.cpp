@@ -1,9 +1,9 @@
-#include"z80.hpp"
+#include"sm83.hpp"
 
 
 int main()
 {
-    z80 cpu;
+    sm83 cpu;
     cpu.loadFile("Tetris.gb");
     cpu.bus[0xFF44] = 0x94;
 
