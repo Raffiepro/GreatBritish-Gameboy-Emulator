@@ -1,5 +1,5 @@
 #pragma once
-using u8 = unsigned char;
-using u16 = unsigned short;
-using s8 = signed char;
-using s16 = signed short;
+typedef unsigned char u8;
+typedef unsigned short u16;
+typedef signed char s8;
+typedef signed short s16;

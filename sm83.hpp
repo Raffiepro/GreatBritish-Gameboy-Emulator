@@ -6,14 +6,14 @@
 #include"header.h"
 #include"opcodes.h"
 
-enum z80Flag : u8
+enum sm83Flag : u8
 {
     fz = 7, //Zero flag
     fn = 6, //Subtraction flag (BCD)
     fh = 5, //Half Carry flag (BCD)
     fc = 4 //Carry flag
 };
-enum z80Cond : u8
+enum sm83Cond : u8
 {
     cnz,
     cz,
@@ -26,7 +26,7 @@ void setBit(u8* byte, u8 bit, bool value)
     *byte = value ? (*byte | (1<<bit)) : (*byte & ~(1<<bit));
 }
 
-struct z80
+struct sm83
 {
     u16 af=0x0100,bc=0,de=0,hl=0;
     u16 sp,pc=0x100; //Stack Pointer and Program Counter
@@ -63,7 +63,7 @@ struct z80
         *dst=*src;
     }
     inline void JR(s8 offset){pc+=offset+2;jumped=true;} //JUMP RELATIVE (+2 to include itself in the PC)
-    void JR(z80Cond cond,s8* offset) //JUMP RELATIVE WITH CONDITION
+    void JR(sm83Cond cond,s8* offset) //JUMP RELATIVE WITH CONDITION
     {
         //if(cond==cnz) printf("MOMOMOMO %02X %02X\n",*f,*f&0x80);
         if(cond==cnz&&*f&0x80) return; //Hacky way of checking zero flag :)
@@ -102,7 +102,7 @@ struct z80
     }
 };
 
-inline void z80::SUB(u8* reg, u8* n)
+inline void sm83::SUB(u8* reg, u8* n)
 {
     u8 hctest = *reg&0x0F; hctest-=*n;
     setBit(f,fh,hctest > (u8)0x0F);
@@ -111,7 +111,7 @@ inline void z80::SUB(u8* reg, u8* n)
     setBit(f,fn,1);
     setBit(f,fc,*n>*reg); //Set if borrow (set if r8 > A)
 }
-inline void z80::CP(u8* reg, u8* n)
+inline void sm83::CP(u8* reg, u8* n)
 {
     u8 hctest = *reg&0x0F; hctest-=*n;
     setBit(f,fh,hctest > (u8)0x0F);
@@ -121,14 +121,14 @@ inline void z80::CP(u8* reg, u8* n)
     setBit(f,fn,1);
     setBit(f,fc,*n>comparison); //Set if borrow (set if r8 > A)
 }
-inline void z80::INC(u8* reg)
+inline void sm83::INC(u8* reg)
 {
     setBit(f,fh,(*reg&0x0F + 1) > 0x0F);
     *reg+=1;
     setBit(f,fz,*reg==0);
     setBit(f,fn,0);
 }
-inline void z80::DEC(u8* reg)
+inline void sm83::DEC(u8* reg)
 {
     u8 hctest = *reg&0x0F; hctest-=1;
     setBit(f,fh,hctest > (u8)0x0F);
@@ -137,7 +137,7 @@ inline void z80::DEC(u8* reg)
     setBit(f,fn,1);
 }
 
-void z80::decode(u8* op)
+void sm83::decode(u8* op)
 {
     printf("%s (%02X",unprefixed[*op].mnemonic,*op);
     for(int i=1;i<unprefixed[*op].bytes;i++)
