@@ -47,13 +47,14 @@ struct sm83
 
     bool jumped=false;
 
-    void decode(u8* op);
+    bool decode(u8* op);
     inline void SUB(u8* reg, u8* n);
     inline void CP(u8* reg, u8* n);
     inline void INC(u8* reg);
-    inline void INC(u16* reg){*reg++;}
     inline void DEC(u8* reg);
-    inline void XOR(u8* reg){*a^=*reg;};
+    inline void OR(u8* other){*a|=*other; setBit(f,fz,*a==0); setBit(f,fn,0);setBit(f,fh,0);setBit(f,fc,0);}
+    inline void AND(u8* other){*a&=*other; setBit(f,fz,*a==0); setBit(f,fn,0);setBit(f,fh,1);setBit(f,fc,0);}
+    inline void XOR(u8* other){*a^=*other; setBit(f,fz,*a==0); setBit(f,fn,0);setBit(f,fh,0);setBit(f,fc,0);}
     inline void LD(u16* dst, u16* src)
     {
         *dst=*src;
@@ -63,14 +64,17 @@ struct sm83
         *dst=*src;
     }
     inline void JR(s8 offset){pc+=offset+2;jumped=true;} //JUMP RELATIVE (+2 to include itself in the PC)
-    void JR(sm83Cond cond,s8* offset) //JUMP RELATIVE WITH CONDITION
+    inline bool JR(sm83Cond cond, s8* offset) // JUMP RELATIVE WITH CONDITION
     {
-        //if(cond==cnz) printf("MOMOMOMO %02X %02X\n",*f,*f&0x80);
-        if(cond==cnz&&*f&0x80) return; //Hacky way of checking zero flag :)
-        if(cond==cz&&!(*f&80)) return;
-        if(cond==cnc&&*f&0x10) return; //Hacky way of checking carry flag :)
-        if(cond==cc&&!(*f&0x10)) return;
-        pc+= *offset+2;  jumped=true;
+        if (cond == cnz && (*f & 0x80)) return false; // Check Zero flag
+        if (cond == cz && !(*f & 0x80)) return false;
+        if (cond == cnc && (*f & 0x10)) return false; // Check Carry flag
+        if (cond == cc && !(*f & 0x10)) return false;
+
+        //i am adding the required offset to pc afterward because this code is sus
+        pc += (*offset);
+        jumped = true;
+        return true;
     }
 
     void printRegs()
@@ -83,12 +87,19 @@ struct sm83
     {
         pc += unprefixed[bus[pc]].bytes;
     }
+    bool missing_opcode=false;
     void execute()
     {
-        decode(&bus[pc]);
+        if(bus[pc]==0x00&&pc!=0x100)
+        {
+            printf("Null\n");
+            exit(0);
+        }
+        if(!decode(&bus[pc])) missing_opcode=true;
+        printRegs();
         if(!jumped) next();
         else jumped=false;
-        //printRegs();
+        if(missing_opcode) getchar();
     }
     void loadFile(const char* filename)
     {
@@ -137,46 +148,56 @@ inline void sm83::DEC(u8* reg)
     setBit(f,fn,1);
 }
 
-void sm83::decode(u8* op)
+bool sm83::decode(u8* op)
 {
     printf("%s (%02X",unprefixed[*op].mnemonic,*op);
     for(int i=1;i<unprefixed[*op].bytes;i++)
     {
         printf(" %02X",*(op+i));
     }
-    printf(")\n");
+    printf(") %04X\n",pc);
     //printf("%s (%02X)\n",unprefixed[*op].mnemonic,*op);
 
     const u8 length = unprefixed[*op].bytes;
     switch(*op)
     {
         case 0x00: break;
+        case 0x01: LD(&bc,(u16*)(op+1)); break;
         case 0x05: DEC(b); break;
         case 0x06: LD(b,op+1); break;
+        case 0x0B: bc-=1; break;
         case 0x0C: INC(c); break;
         case 0x0D: DEC(c); break;
         case 0x0E: LD(c,op+1); break;
-        case 0x20: JR(cnz,(s8*)(op+1)); break;
+        case 0x20: if(JR(cnz,(s8*)(op+1))) {pc+=2;} break;
         case 0x21: LD(&hl,(u16*)(op+1)); break;
         case 0x2A: LD(a,&bus[hl]); hl++; break; //LD A, [HL+]
         case 0x2C: INC(l); break;
+        case 0x2F: *a=~*a; setBit(f,fn,1); setBit(f,fh,1); break;
         case 0x31: LD(&sp,(u16*)(op+1)); break;
         case 0x32: LD(&bus[hl],a); hl-=1; break; //LD [HL-] A
         case 0x36: LD(&bus[hl],op+1); break; //LDH A, [a8]
         case 0x3E: LD(a,op+1); break;
-        case 0xC3:
+        case 0x78: LD(a,b); break;
+        case 0xA3: AND(e); break;
+        case 0xAF: XOR(a); break;
+        case 0xB1: OR(c); break;
+        case 0xC3: pc=*(u16*)(op+1); jumped=true; break;
+        case 0xCD: //This pushes the address of the instruction after the CALL on the stack, such that RET can pop it later; then, it executes an implicit JP n16 -RGBDS DOCS
         {
+            sp-=2;
+            bus[sp]=(pc+3)&0xFF00;
+            bus[sp+1]=(pc+3)&0x00FF;
             pc=*(u16*)(op+1);
             jumped=true;
             break;
         }
-        case 0xAF: XOR(a); break;
         case 0xE0: LD(&bus[(u16)0xFF00 + *(op+1)],a); break; //LDH [a8], A
         case 0xE2: LD(&bus[(u16)0xFF00+*c],a); break; //LD [$FF00+C],A
         case 0xEA: LD(&bus[*(u16*)(op+1)], a); break; //LD [a16], A
-        case 0xF0: LD(a,&bus[(u16)0xFF00 + *(op+1)]); printf("%04X\n",(u16)0xFF00 + *(op+1)); break; //LDH A, [a8]
+        case 0xF0: LD(a,&bus[(u16)0xFF00 + *(op+1)]); break; //LDH A, [a8]
         case 0xF3: IME=false; break; //DI (DISABLE INTERRUPT)
-        case 0xFE: CP(a,op+1); printf("%02X %02X\n",*a,*(op+1)); break; //CP A n8
+        case 0xFE: CP(a,op+1); break; //CP A n8
         default:
             printf("Missing opcode\n");
             printf("%s (%02X",unprefixed[*op].mnemonic,*op);
@@ -186,6 +207,7 @@ void sm83::decode(u8* op)
             }
             printf(")\n");
             printRegs();
-            exit(-1);
+            return false;
     }
+    return true;
 }
