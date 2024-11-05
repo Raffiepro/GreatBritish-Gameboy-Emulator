@@ -1,5 +1,6 @@
 #include"sm83.hpp"
 #include<assert.h>
+#include<time.h>
 
 int main()
 {
@@ -16,6 +17,8 @@ int main()
 
     while(true)
     {
+        cpu.bus[0xFF44]+=1;
+        cpu.bus[0xFF44]%=154;
         cpu.execute();
     }
     return 0;
