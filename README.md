@@ -20,9 +20,3 @@ God save the King.
 ## FAQ:  
 ### Q: Why should I take part in the using of this delectable piece of media?
 ### A: Because it's british :)
-
-### Q: If I were to use this will I get a free tea time consisting of tea, fish and chips?
-### A: No
-
-### Q: Why are you making this emulator?
-### A: Because there's no way I'm using an emulator that's not british 🇬🇧 🇬🇧 🇬🇧

@@ -55,11 +55,11 @@ struct sm83
     inline void OR(u8* other){*a|=*other; setBit(f,fz,*a==0); setBit(f,fn,0);setBit(f,fh,0);setBit(f,fc,0);}
     inline void AND(u8* other){*a&=*other; setBit(f,fz,*a==0); setBit(f,fn,0);setBit(f,fh,1);setBit(f,fc,0);}
     inline void XOR(u8* other){*a^=*other; setBit(f,fz,*a==0); setBit(f,fn,0);setBit(f,fh,0);setBit(f,fc,0);}
-    inline void LD(u16* dst, u16* src)
+    void LD(u16* dst, u16* src)
     {
         *dst=*src;
     }
-    inline void LD(u8* dst, u8* src)
+    void LD(u8* dst, u8* src)
     {
         *dst=*src;
     }
@@ -71,10 +71,17 @@ struct sm83
         if (cond == cnc && (*f & 0x10)) return false; // Check Carry flag
         if (cond == cc && !(*f & 0x10)) return false;
 
-        //i am adding the required offset to pc afterward because this code is sus
+        //I am adding the required offset to pc in the instruction itself
         pc += (*offset);
         jumped = true;
         return true;
+    }
+    inline void POP(u16& reg)
+    {
+        reg=(u16)bus[sp];
+        sp+=1;
+        reg|=((u16)bus[sp])<<8;
+        sp+=1;
     }
 
     void printRegs()
@@ -88,15 +95,18 @@ struct sm83
         pc += unprefixed[bus[pc]].bytes;
     }
     bool missing_opcode=false;
+    bool EI_executed=false;
     void execute()
     {
+        bool prev_EI_executed=EI_executed; //EI HANDLING
         if(bus[pc]==0x00&&pc!=0x100)
         {
             printf("Null\n");
             exit(0);
         }
         if(!decode(&bus[pc])) missing_opcode=true;
-        printRegs();
+        if(prev_EI_executed != EI_executed) {IME=true; EI_executed=false;} //ALSO EI HANDLING
+        //printRegs();
         if(!jumped) next();
         else jumped=false;
         if(missing_opcode) getchar();
@@ -150,13 +160,12 @@ inline void sm83::DEC(u8* reg)
 
 bool sm83::decode(u8* op)
 {
-    printf("%s (%02X",unprefixed[*op].mnemonic,*op);
-    for(int i=1;i<unprefixed[*op].bytes;i++)
+    //printf("%s (%02X",unprefixed[*op].mnemonic,*op);
+    /*for(int i=1;i<unprefixed[*op].bytes;i++)
     {
         printf(" %02X",*(op+i));
     }
-    printf(") %04X\n",pc);
-    //printf("%s (%02X)\n",unprefixed[*op].mnemonic,*op);
+    printf(") %04X\n",pc);*/
 
     const u8 length = unprefixed[*op].bytes;
     switch(*op)
@@ -173,12 +182,13 @@ bool sm83::decode(u8* op)
         case 0x21: LD(&hl,(u16*)(op+1)); break;
         case 0x2A: LD(a,&bus[hl]); hl++; break; //LD A, [HL+]
         case 0x2C: INC(l); break;
-        case 0x2F: *a=~*a; setBit(f,fn,1); setBit(f,fh,1); break;
+        //case 0x2F: *a=~*a; setBit(f,fn,1); setBit(f,fh,1); break;
         case 0x31: LD(&sp,(u16*)(op+1)); break;
         case 0x32: LD(&bus[hl],a); hl-=1; break; //LD [HL-] A
         case 0x36: LD(&bus[hl],op+1); break; //LDH A, [a8]
         case 0x3E: LD(a,op+1); break;
         case 0x78: LD(a,b); break;
+        case 0xC9: printf("RET FROM: %04X ",pc); POP(pc); jumped=true; printf("TO: %04X\n",pc); getchar(); break;
         case 0xA3: AND(e); break;
         case 0xAF: XOR(a); break;
         case 0xB1: OR(c); break;
@@ -186,10 +196,11 @@ bool sm83::decode(u8* op)
         case 0xCD: //This pushes the address of the instruction after the CALL on the stack, such that RET can pop it later; then, it executes an implicit JP n16 -RGBDS DOCS
         {
             sp-=2;
-            bus[sp]=(pc+3)&0xFF00;
-            bus[sp+1]=(pc+3)&0x00FF;
+            *(u16*)&bus[sp]=pc+3;
             pc=*(u16*)(op+1);
+            printf("CALL FROM: %04X TO: %04X\n",*(u16*)&bus[sp],pc);
             jumped=true;
+            getchar();
             break;
         }
         case 0xE0: LD(&bus[(u16)0xFF00 + *(op+1)],a); break; //LDH [a8], A
@@ -197,6 +208,7 @@ bool sm83::decode(u8* op)
         case 0xEA: LD(&bus[*(u16*)(op+1)], a); break; //LD [a16], A
         case 0xF0: LD(a,&bus[(u16)0xFF00 + *(op+1)]); break; //LDH A, [a8]
         case 0xF3: IME=false; break; //DI (DISABLE INTERRUPT)
+        case 0xFB: EI_executed=true; break; //EI (ENABLE INTERRUPT) ONLY EXECUTED [AFTER] THE NEXT INSTRUCTION
         case 0xFE: CP(a,op+1); break; //CP A n8
         default:
             printf("Missing opcode\n");
