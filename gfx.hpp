@@ -76,5 +76,6 @@ void gfxUpdate(SDL_Renderer *renderer, u8* bus)
             SDL_DestroyTexture(texture);
         }
     }
+    SDL_FreeSurface(surface);
     SDL_RenderPresent(renderer);
 }
