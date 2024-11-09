@@ -22,6 +22,7 @@ void SDLStuff()
         gfxUpdate(renderer, cpu.bus, surface);
         gfxEvent(&event);
     }
+    SDL_FreeSurface(surface);
 }
 
 int main()
