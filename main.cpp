@@ -2,28 +2,10 @@
 #include<assert.h>
 #include"gfx.hpp"
 #include<SDL2/SDL.h>
-#include<thread>
 
 SDL_Window* window;
 SDL_Renderer* renderer;
 sm83 cpu;
-
-void SDLStuff()
-{
-    SDL_Init(SDL_INIT_EVERYTHING);
-    window=SDL_CreateWindow("God Save The King!",SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,160*2,144*2,0);
-    renderer = SDL_CreateRenderer(window, -1, 0);
-    SDL_RenderSetScale(renderer, 2, 2);
-
-    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0,8,8,32,SDL_PIXELFORMAT_RGBA32);
-    SDL_Event event;
-    while(true)
-    {
-        gfxUpdate(renderer, cpu.bus, surface);
-        gfxEvent(&event);
-    }
-    SDL_FreeSurface(surface);
-}
 
 int main()
 {
@@ -43,15 +25,40 @@ int main()
     cpu.loadFile("world.gb");
     cpu.bus[0xFF44] = 0x94;
     
-    std::thread graphx(SDLStuff);
+    SDL_Init(SDL_INIT_EVERYTHING);
+    window=SDL_CreateWindow("God Save The King!",SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,160*2,144*2,0);
+    renderer = SDL_CreateRenderer(window, -1, 0);
+    SDL_RenderSetScale(renderer, 2, 2);
 
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0,8,8,32,SDL_PIXELFORMAT_RGBA32);
+    SDL_Event event;
+
+    u32 gfxTime=SDL_GetTicks();
+    u32 cpuTime=SDL_GetTicks();
+    u32 now;
     while(true)
     {
-        cpu.bus[0xFF44]+=1;
-        cpu.bus[0xFF44]%=154;
-        cpu.execute();
+        now=SDL_GetTicks();
+
+        u32 cpuDelta=now-cpuTime;
+        //if(cpuDelta >= 1000/4190000.0) //NOT QUITE RIGHT
+        //{
+            cpu.bus[0xFF44]+=1;
+            cpu.bus[0xFF44]%=154;
+            cpu.execute();
+            cpuTime=now;
+        //}
+        
+        u32 gfxDelta=now-gfxTime;
+        if (gfxDelta >= 1000/60.0)
+        {
+            gfxUpdate(renderer, cpu.bus, surface);
+            gfxTime=now;
+        }
+        gfxEvent(&event);
     }
 
+    SDL_FreeSurface(surface);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

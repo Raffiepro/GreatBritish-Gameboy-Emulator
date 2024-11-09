@@ -48,7 +48,7 @@ void gfxCreateTileSurface(const SDL_Surface* surface,const u8* tileData) //SDL_C
     //printf("ENDIMG\n");
 }
 
-void gfxUpdate(SDL_Renderer *renderer, u8* bus, SDL_Surface* surface)
+void gfxUpdate(SDL_Renderer *renderer, u8* bus, SDL_Surface* surface) //TAKES 5MS ON RTX, NOT VERY GOOD..
 {
     SDL_SetRenderDrawColor(renderer,0,0,0,255);
     SDL_RenderClear(renderer);
