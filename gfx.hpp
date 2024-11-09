@@ -48,15 +48,13 @@ void gfxCreateTileSurface(const SDL_Surface* surface,const u8* tileData) //SDL_C
     //printf("ENDIMG\n");
 }
 
-void gfxUpdate(SDL_Renderer *renderer, u8* bus)
+void gfxUpdate(SDL_Renderer *renderer, u8* bus, SDL_Surface* surface)
 {
     SDL_SetRenderDrawColor(renderer,0,0,0,255);
     SDL_RenderClear(renderer);
     SDL_Rect rect;
     rect.w=8; rect.h=8;
     
-    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0,8,8,32,SDL_PIXELFORMAT_RGBA32);
-    if(surface==NULL) {std::cerr<<"SURFACE IS NULL\n"; exit(-1);}
     SDL_Texture* texture;
 
     for(u8 y=0;y<32;y++)
@@ -76,6 +74,5 @@ void gfxUpdate(SDL_Renderer *renderer, u8* bus)
             SDL_DestroyTexture(texture);
         }
     }
-    SDL_FreeSurface(surface);
     SDL_RenderPresent(renderer);
 }

@@ -14,10 +14,12 @@ void SDLStuff()
     window=SDL_CreateWindow("God Save The King!",SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,160*2,144*2,0);
     renderer = SDL_CreateRenderer(window, -1, 0);
     SDL_RenderSetScale(renderer, 2, 2);
+
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0,8,8,32,SDL_PIXELFORMAT_RGBA32);
     SDL_Event event;
     while(true)
     {
-        gfxUpdate(renderer, cpu.bus);
+        gfxUpdate(renderer, cpu.bus, surface);
         gfxEvent(&event);
     }
 }
