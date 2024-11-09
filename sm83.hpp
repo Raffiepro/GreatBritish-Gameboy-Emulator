@@ -29,14 +29,8 @@ void setBit(u8* byte, u8 bit, bool value)
 
 struct sm83
 {
-    u16 af=0x0100,bc=0,de=0,hl=0;
-    u16 sp,pc=0x100; //Stack Pointer and Program Counter
-    u8 bus[65536];
-
-    //CPU INTERNAL FLAGS
-    bool IME=true;   //Interrupt master enable flag [write only] affected by: ei, di, reti
-
-    // The 8-bit registers of the Gameboy are actually the same 16-bit ones but cut in half :) The more you know!
+    u16 af=0x0180,bc=0x0013,de=0x00D8,hl=0x014D;
+    //The 8-bit registers of the Gameboy are actually the same 16-bit ones but cut in half
     u8* a=(u8*)&af+1;
     u8* b=(u8*)&bc+1;
     u8* c=(u8*)&bc;
@@ -45,6 +39,11 @@ struct sm83
     u8* h=(u8*)&hl+1;
     u8* l=(u8*)&hl;
     u8* f=(u8*)&af;
+    u16 sp=0xFFFE,pc=0x100; //Stack Pointer and Program Counter
+    u8 bus[65536];
+
+    //CPU INTERNAL FLAGS
+    bool IME=true;   //Interrupt master enable flag [write only] affected by: ei, di, reti
 
     bool jumped=false;
 
@@ -68,15 +67,14 @@ struct sm83
         *dst=*src;
     }
     inline void JR(s8 offset){pc+=offset+2;jumped=true;} //JUMP RELATIVE (+2 to include itself in the PC)
-    inline bool JR(sm83Cond cond, s8* offset) // JUMP RELATIVE WITH CONDITION
+    inline bool JR(sm83Cond cond, s8 offset) // JUMP RELATIVE WITH CONDITION
     {
         if (cond == cnz && (*f & 0x80)) return false; // Check Zero flag
         if (cond == cz && !(*f & 0x80)) return false;
         if (cond == cnc && (*f & 0x10)) return false; // Check Carry flag
         if (cond == cc && !(*f & 0x10)) return false;
 
-        //I am adding the required offset to pc in the instruction itself
-        pc += (*offset);
+        pc += offset+2;
         jumped = true;
         return true;
     }
@@ -105,8 +103,8 @@ struct sm83
 
     void printRegs()
     {
-        printf("A: %02X  F: %02X  (AF: %04X)\nB: %02X  C: %02X  (BC: %04X)\nD: %02X  E: %02X  (DE: %04X)\nH: %02X  L: %02X  (HL: %04X)\nPC: %04X\n",
-            *a,*f,af,*b,*c,bc,*d,*e,de,*h,*l,hl,pc);
+        printf("A: %02X  F: %02X  (AF: %04X)\nB: %02X  C: %02X  (BC: %04X)\nD: %02X  E: %02X  (DE: %04X)\nH: %02X  L: %02X  (HL: %04X)\nPC: %04X\nSP: %04X\n",
+            *a,*f,af,*b,*c,bc,*d,*e,de,*h,*l,hl,pc,sp);
     }
 
     void next()
@@ -127,11 +125,12 @@ struct sm83
         if(!decode(&bus[pc])) missing_opcode=true;
         if(prev_EI_executed != EI_executed) {IME=true; EI_executed=false;} //ALSO EI HANDLING
         
-        printRegs();
+        //printRegs();
 
         if(!jumped) next();
         else jumped=false;
         if(missing_opcode) getchar();
+        //getchar();
     }
     void loadFile(const char* filename)
     {
@@ -201,12 +200,12 @@ inline void sm83::DEC(u8* reg)
 
 bool sm83::decode(u8* op)
 {
-    printf("%s (%02X",unprefixed[*op].mnemonic,*op);
+    /*printf("%s (%02X",unprefixed[*op].mnemonic,*op);
     for(int i=1;i<unprefixed[*op].bytes;i++)
     {
         printf(" %02X",*(op+i));
     }
-    printf(") %04X\n",pc);
+    printf(") %04X\n",pc);*/
 
     const u8 length = unprefixed[*op].bytes;
     switch(*op)
@@ -223,12 +222,15 @@ bool sm83::decode(u8* op)
         case 0x12: LD(&bus[de],a); break;
         case 0x13: de+=1; break;
         case 0x16: LD(d,op+1); break;
+        case 0x18: JR((s8)*(op+1)); break;
         case 0x19: ADDHL(de); break;
         case 0x1A: LD(a,&bus[de]); break;
-        case 0x20: if(JR(cnz,(s8*)(op+1))) {pc+=2;} break;
+        case 0x1C: INC(e); break;
+        case 0x20: JR(cnz,(s8)*(op+1)); break;
         case 0x21: LD(&hl,(u16*)(op+1)); break;
         case 0x22: LD(&bus[hl],a); hl+=1; break; //LD [HL-] A
         case 0x23: hl+=1; break;
+        case 0x28: JR(cz,(s8)*(op+1)); break;
         case 0x2A: LD(a,&bus[hl]); hl+=1; break; //LD A, [HL+]
         case 0x2C: INC(l); break;
         case 0x2F: *a=~*a; setBit(f,fn,1); setBit(f,fh,1); break;
@@ -244,15 +246,22 @@ bool sm83::decode(u8* op)
         case 0x78: LD(a,b); break;
         case 0x79: LD(a,c); break;
         case 0x7C: LD(a,h); break;
+        case 0x7E: LD(a,&bus[hl]); break;
         case 0x87: ADD(a,a); break;
-        case 0xC9: printf("RET FROM: %04X ",pc); POP(pc); jumped=true; printf("TO: %04X",pc); getchar(); break;
         case 0xA1: AND(c); break;
         case 0xA3: AND(e); break;
+        case 0xA7: AND(a); break;
         case 0xA9: XOR(c); break;
         case 0xAF: XOR(a); break;
         case 0xB0: OR(b); break;
         case 0xB1: OR(c); break;
+        case 0xC1: POP(bc); break;
+        case 0xC2: if(!(*f&0x80)){pc=*(u16*)(op+1);jumped=true;} break; //JP NZ a16
         case 0xC3: pc=*(u16*)(op+1); jumped=true; break;
+        case 0xC5: PUSH(bc); break;
+        case 0xC8: if(*f&0x80) {POP(pc); jumped=true;} break;
+        case 0xC9: POP(pc); jumped=true; break;
+        case 0xCA: if(*f&0x80) {pc=*(u16*)(op+1); jumped=true;} break; //JP Z a16
         case 0xCB: return cb_decode(op+1);
         case 0xCD: //This pushes the address of the instruction after the CALL on the stack, such that RET can pop it later; then, it executes an implicit JP n16 -RGBDS DOCS
         {
@@ -261,11 +270,10 @@ bool sm83::decode(u8* op)
             pc=*(u16*)(op+1);
             jumped=true;
         }
-            printf("CALL FROM: %04X TO: %04X",(*(u16*)&bus[sp])-3,pc);
-            getchar();
             break;
         case 0xD1: POP(de); break;
         case 0xD5: PUSH(de); break;
+        case 0xDA: if(*f&0x10) {pc=*(u16*)(op+1); jumped=true;} break; //JP C a16
         case 0xE0: LD(&bus[(u16)0xFF00 + *(op+1)],a); break; //LDH [a8], A
         case 0xE1: POP(hl); break;
         case 0xE2: LD(&bus[(u16)0xFF00+*c],a); break; //LD [$FF00+C],A
@@ -273,9 +281,11 @@ bool sm83::decode(u8* op)
         case 0xE6: AND(op+1); break;
         case 0xE9: pc=hl; jumped=true; break;
         case 0xEA: LD(&bus[*(u16*)(op+1)], a); break; //LD [a16], A
-        case 0xEF: {u16 retaddr=pc+1; PUSH(retaddr); pc=0x28; jumped=true;} printf("RST FROM: %04X TO: %04X",(*(u16*)&bus[sp])-1,pc); getchar(); break; //RST $28
+        case 0xEF: {u16 retaddr=pc+1; PUSH(retaddr); pc=0x28; jumped=true;} break;
         case 0xF0: LD(a,&bus[(u16)0xFF00 + *(op+1)]); break; //LDH A, [a8]
         case 0xF3: IME=false; break; //DI (DISABLE INTERRUPT)
+        case 0xF5: PUSH(af); break;
+        case 0xFA: LD(a,&bus[*(u16*)(op+1)]); break;
         case 0xFB: EI_executed=true; break; //EI (ENABLE INTERRUPT) ONLY EXECUTED [AFTER] THE NEXT INSTRUCTION
         case 0xFE: CP(a,op+1); break; //CP A n8
         default:
