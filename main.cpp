@@ -22,7 +22,7 @@ int main()
     cpu.JR(cnz,-3);
     assert(cpu.pc==0x100);
 
-    cpu.loadFile("world.gb");
+    cpu.loadFile("Tetris.gb");
     cpu.bus[0xFF44] = 0x94;
     
     SDL_Init(SDL_INIT_EVERYTHING);
@@ -41,12 +41,13 @@ int main()
         now=SDL_GetTicks();
 
         u32 cpuDelta=now-cpuTime;
-        //if(cpuDelta >= 1000/4190000.0) //NOT QUITE RIGHT
+        //if(cpuDelta >= 1000/200.0) //NOT QUITE RIGHT
         //{
             cpu.bus[0xFF44]+=1;
             cpu.bus[0xFF44]%=154;
             cpu.execute();
             cpuTime=now;
+            //getchar();
         //}
         
         u32 gfxDelta=now-gfxTime;

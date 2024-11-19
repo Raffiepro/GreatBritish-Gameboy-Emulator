@@ -136,11 +136,12 @@ struct sm83
     {
         std::ifstream f(filename, std::ios_base::binary | std::ios_base::ate);
         size_t size = f.tellg();
-        if(size>sizeof(bus)) {std::cout<<"ROM TOO BEEG!!\n";return;}
+        if(size>0x8000) {std::cout<<"CONTAINS MBC / EXTRA RAM. RESIZING..\n";size=0x8000;}
         f.seekg(0);
         f.read((char*)&bus,size);
         f.close();
-        std::cout<<"Name: "<<headerFromBus(bus).title<<" size: "<<size<<"b "<<((float)size/sizeof(bus))*100<<"\% usage of total memory\n";
+        std::cout<<"Name: "<<headerFromBus(bus).title<<" memory-mapped chip: "<<cartridge_types[get_cartridge_type_name(headerFromBus(bus).cartridge_type)]<<" extra ram: "<<RAM_sizes[headerFromBus(bus).ram_size]<<" size: "<<size<<"b "<<((float)size/sizeof(bus))*100<<"\% usage of total memory\n";
+        getchar();
     }
 };
 
@@ -200,12 +201,12 @@ inline void sm83::DEC(u8* reg)
 
 bool sm83::decode(u8* op)
 {
-    /*printf("%s (%02X",unprefixed[*op].mnemonic,*op);
+    printf("%s (%02X",unprefixed[*op].mnemonic,*op);
     for(int i=1;i<unprefixed[*op].bytes;i++)
     {
         printf(" %02X",*(op+i));
     }
-    printf(") %04X\n",pc);*/
+    printf(") %04X\n",pc);
 
     const u8 length = unprefixed[*op].bytes;
     switch(*op)
@@ -281,8 +282,9 @@ bool sm83::decode(u8* op)
         case 0xE6: AND(op+1); break;
         case 0xE9: pc=hl; jumped=true; break;
         case 0xEA: LD(&bus[*(u16*)(op+1)], a); break; //LD [a16], A
-        case 0xEF: {u16 retaddr=pc+1; PUSH(retaddr); pc=0x28; jumped=true;} break;
+        case 0xEF: {u16 retaddr=pc+1; PUSH(retaddr); pc=0x28; jumped=true;} break; //RST $28
         case 0xF0: LD(a,&bus[(u16)0xFF00 + *(op+1)]); break; //LDH A, [a8]
+        case 0xF1: POP(af); break;
         case 0xF3: IME=false; break; //DI (DISABLE INTERRUPT)
         case 0xF5: PUSH(af); break;
         case 0xFA: LD(a,&bus[*(u16*)(op+1)]); break;
