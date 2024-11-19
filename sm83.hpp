@@ -122,10 +122,27 @@ struct sm83
             printf("Null\n");
             exit(0);
         }
+
+        /*if(bus[pc]==0xC9||bus[pc]==0xCD||bus[pc]==0xC3||bus[pc]==0xE9||bus[pc]==0xC2||bus[pc]==0xC8)
+        {
+            printf("%s (%02X",unprefixed[bus[pc]].mnemonic,bus[pc]);
+            for(int i=1;i<unprefixed[bus[pc]].bytes;i++)
+            {
+                printf(" %02X",bus[pc+i]);
+            }
+            printf(") %04X\n",pc);
+            printRegs();
+        }*/
+        printf("%s (%02X",unprefixed[bus[pc]].mnemonic,bus[pc]);
+        for(int i=1;i<unprefixed[bus[pc]].bytes;i++)
+        {
+            printf(" %02X",bus[pc+i]);
+        }
+        printf(") %04X\n",pc);
+        printRegs();
+
         if(!decode(&bus[pc])) missing_opcode=true;
         if(prev_EI_executed != EI_executed) {IME=true; EI_executed=false;} //ALSO EI HANDLING
-        
-        //printRegs();
 
         if(!jumped) next();
         else jumped=false;
@@ -159,7 +176,6 @@ inline void sm83::ADDHL(u16& reg)
     u8 hctest = hl&0x0F; hctest+=reg;
     setBit(f,fh,hctest > (u8)0x0F);
     hl+=reg;
-    setBit(f,fz,hl==0);
     setBit(f,fn,0);
     setBit(f,fc,reg>hl); //Set if borrow
 }
@@ -201,12 +217,12 @@ inline void sm83::DEC(u8* reg)
 
 bool sm83::decode(u8* op)
 {
-    printf("%s (%02X",unprefixed[*op].mnemonic,*op);
+    /*printf("%s (%02X",unprefixed[*op].mnemonic,*op);
     for(int i=1;i<unprefixed[*op].bytes;i++)
     {
         printf(" %02X",*(op+i));
     }
-    printf(") %04X\n",pc);
+    printf(") %04X\n",pc);*/
 
     const u8 length = unprefixed[*op].bytes;
     switch(*op)
@@ -229,7 +245,7 @@ bool sm83::decode(u8* op)
         case 0x1C: INC(e); break;
         case 0x20: JR(cnz,(s8)*(op+1)); break;
         case 0x21: LD(&hl,(u16*)(op+1)); break;
-        case 0x22: LD(&bus[hl],a); hl+=1; break; //LD [HL-] A
+        case 0x22: LD(&bus[hl],a); hl+=1; break; //LD [HL+] A
         case 0x23: hl+=1; break;
         case 0x28: JR(cz,(s8)*(op+1)); break;
         case 0x2A: LD(a,&bus[hl]); hl+=1; break; //LD A, [HL+]
@@ -237,13 +253,18 @@ bool sm83::decode(u8* op)
         case 0x2F: *a=~*a; setBit(f,fn,1); setBit(f,fh,1); break;
         case 0x31: LD(&sp,(u16*)(op+1)); break;
         case 0x32: LD(&bus[hl],a); hl-=1; break; //LD [HL-] A
+        case 0x34: INC(&bus[hl]); break;
+        case 0x35: DEC(&bus[hl]); break;
         case 0x36: LD(&bus[hl],op+1); break; //LDH A, [a8]
+        case 0x3C: INC(a); break;
         case 0x3E: LD(a,op+1); break;
         case 0x47: LD(b,a); break;
         case 0x4F: LD(c,a); break;
         case 0x56: LD(d,&bus[hl]); break;
         case 0x5E: LD(e,&bus[hl]); break;
         case 0x5F: LD(e,a); break;
+        case 0x76: break; //MUST BE DONE
+        case 0x77: LD(&bus[hl],a); break;
         case 0x78: LD(a,b); break;
         case 0x79: LD(a,c); break;
         case 0x7C: LD(a,h); break;
@@ -256,6 +277,7 @@ bool sm83::decode(u8* op)
         case 0xAF: XOR(a); break;
         case 0xB0: OR(b); break;
         case 0xB1: OR(c); break;
+        case 0xC0: if(!(*f&0x80)) {POP(pc); jumped=true;} break;
         case 0xC1: POP(bc); break;
         case 0xC2: if(!(*f&0x80)){pc=*(u16*)(op+1);jumped=true;} break; //JP NZ a16
         case 0xC3: pc=*(u16*)(op+1); jumped=true; break;
@@ -272,6 +294,7 @@ bool sm83::decode(u8* op)
             jumped=true;
         }
             break;
+        case 0xCF: {u16 retaddr=pc+1; PUSH(retaddr); pc=0x08; jumped=true;} break; //RST $08
         case 0xD1: POP(de); break;
         case 0xD5: PUSH(de); break;
         case 0xDA: if(*f&0x10) {pc=*(u16*)(op+1); jumped=true;} break; //JP C a16
